@@ -4,6 +4,7 @@
 
 use super::account::{self, Account, AuthMethod, Platform};
 use super::payload::{self, ApplySummary};
+use super::engine::{decide_poll, PollAction};
 use super::provider::{
     self, map_device_code_error, parse_content_file, parse_device_poll, parse_user_login,
     DevicePollOutcome, SyncError,
@@ -360,6 +361,24 @@ fn verify_status_mapping_splits_bad_token_from_missing_permission() {
     // needed permission) and must not be lumped with invalid tokens.
     let forbidden = super::provider::SyncError::Forbidden("reason".into());
     assert_eq!(forbidden.code(), "forbidden");
+}
+
+#[test]
+fn decide_poll_orders_push_over_pull() {
+    use PollAction::*;
+    // Not logged in → never poll.
+    assert_eq!(decide_poll(false, false, false), SkipNotLoggedIn);
+    assert_eq!(decide_poll(false, true, true), SkipNotLoggedIn);
+    // Logged in, idle → poll.
+    assert_eq!(decide_poll(true, false, false), Pull);
+    // Local unpushed mutations win over a pull so fresh edits are not
+    // snapshotted-and-discarded in favour of an older remote copy.
+    assert_eq!(decide_poll(true, true, false), SkipPendingPush);
+    // A push is mid-round-trip; its PUT decides the remote state.
+    assert_eq!(decide_poll(true, false, true), SkipInFlight);
+    // Dirty beats in-flight in the ordering — the in-flight push will
+    // publish the dirty state, so the next tick sees clean + idle.
+    assert_eq!(decide_poll(true, true, true), SkipPendingPush);
 }
 
 #[test]

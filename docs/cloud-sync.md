@@ -116,16 +116,26 @@ hosts 文件的对应关系。拉取覆盖由云同步模块自写：解析载�
    - 仓库存在但无配置文件 → 推送本地数据 → 完成（本地为源）。
 3. 展示结果摘要（建了仓库/覆盖了本地/推送了本地，条目数）并保存账户信息。
 
-### 启动静默拉取
+### 持续同步：启动拉取 + 远端轮询
 
-`lib.rs::setup` 中：应用启动且数据目录可用时，若存在账户信息且非数据目录恢复状态，
-延迟数秒后静默拉取一次（避免阻塞启动），流程：
+模拟本地 git 的工作方式：启动时拉一次，之后后台持续监听远端变动。
 
-1. 读远端配置文件；
-2. 与本地 `last_hash` 比较，不一致才继续（一致则零成本跳过）；
-3. 覆盖本地前，先写快照到 `~/.SwitchHosts/internal/snapshots/<时间戳>.json`（保留最近 N 份）；
-4. 解析并原子落盘（复用 manifest/entries/trashcan 写入原语，在 `lock_store` 内完成）；
-5. 广播 `reload_list` 让前端刷新树；失败仅记日志与状态，不打断使用。
+启动拉取（`lib.rs::setup`）：应用启动且数据目录可用时，若已登录且非恢复状态，延迟 7 秒
+静默拉取一次（避免与渲染进程的初始读写争锁）。
+
+远端轮询（`cloud_sync::start_remote_poller`）：常驻循环，每 30 秒一拍，决策规则在纯函数
+`decide_poll` 中（可单测）：
+
+1. 未登录 → 跳过；
+2. 本地有未推送改动（DIRTY）→ 跳过，让自动推送先把新改动发出去（推送优先于拉取，
+   避免用远端旧数据覆盖本地刚编辑的内容）；
+3. 推送进行中（IN_FLIGHT）→ 跳过，该次 PUT 才是远端的最终状态；
+4. 否则调用 `pull_once`：读远端文件，与 `last_hash` 比较，一致则零成本返回；不一致则
+   先写快照到 `~/.SwitchHosts/internal/snapshots/<时间戳>.json`（保留最近 10 份），再
+   解析并原子落盘（`lock_store` 内），广播 `reload_list` 刷新前端树。
+
+错误只记日志、下一拍重试；循环永不退出。稳态成本是每拍一次轻量 GET（120 次/小时，
+在 GitHub/Gitee 认证配额内）。
 
 ### 本地改动自动推送
 
@@ -174,7 +184,7 @@ Rust（`src-tauri/src/cloud_sync/`）：
 - `commands.rs` 中新增命令：`sync_status`、`sync_verify_token`、`sync_start_device_login`、
   `sync_poll_device_login`、`sync_setup`、`sync_pull`、`sync_push`、`sync_logout`，
   其中设备码命令仅平台为 GitHub 且 `device_client_id` 非空时有效。
-- 注册到 `lib.rs` 的 handler；`lib.rs::setup` 挂启动静默拉取；数据命令挂 `on_data_mutated`。
+- 注册到 `lib.rs` 的 handler；`lib.rs::setup` 挂启动静默拉取、远端轮询 watcher；数据命令挂 `on_data_mutated`。
 
 前端：
 

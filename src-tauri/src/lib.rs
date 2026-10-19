@@ -424,6 +424,7 @@ pub fn run() {
                 // data mutation eventually reaches the configured repo.
                 cloud_sync::start_startup_pull(app_handle.clone());
                 cloud_sync::start_auto_push_watcher(app_handle.clone());
+                cloud_sync::start_remote_poller(app_handle.clone());
 
                 // Preserve the enabled preference on startup failure; the
                 // preferences pane reads runtime status and lets users fix the
