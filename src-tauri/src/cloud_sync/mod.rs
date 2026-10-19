@@ -21,5 +21,6 @@ mod tests;
 pub(crate) use account::{AuthMethod, Platform};
 pub(crate) use engine::{
     logout, on_data_mutated, poll_device_login, pull_once, push_once, setup,
-    start_auto_push_watcher, start_device_login, start_startup_pull, status, verify_token,
+    start_auto_push_watcher, start_device_login, start_remote_poller,
+    start_startup_pull, status, verify_token,
 };

@@ -38,4 +38,4 @@ plan.md
 # Tauri
 src-tauri/target
 src-tauri/gen/schemas
-./joycode
+.joycode/

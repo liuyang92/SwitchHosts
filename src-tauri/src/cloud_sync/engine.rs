@@ -1,5 +1,7 @@
 //! Sync engine: first-time setup, pull-overwrite, push-if-changed, and the
-//! debounce watcher that turns local data mutations into automatic pushes.
+//! background watchers that keep local and remote in step like a local git
+//! workflow — the auto-push watcher publishes local mutations (debounced),
+//! and the remote poller periodically fetches remote changes.
 //!
 //! Locking discipline mirrors `refresh`: network calls happen **outside**
 //! `lock_store`; the lock only covers local read/modify/write. The payload
@@ -30,6 +32,12 @@ const WATCHER_TICK: Duration = Duration::from_millis(500);
 /// Startup silent pull waits this long so the renderer's initial burst
 /// (manifest reload, config push) gets the storage lock first.
 const STARTUP_PULL_DELAY: Duration = Duration::from_secs(7);
+/// How often the remote poller checks for changes pushed from another
+/// machine. The startup pull covers the first check; after that this loop
+/// mirrors a background `git fetch`. 30s feels timely for a hosts tool
+/// without hammering the platform APIs during an always-on tray session
+/// (120 requests/hour, well inside authenticated limits).
+const POLL_INTERVAL: Duration = Duration::from_secs(30);
 
 pub fn on_data_mutated() {
     DIRTY.store(true, Ordering::Relaxed);
@@ -86,6 +94,59 @@ pub fn start_startup_pull<R: Runtime>(app: AppHandle<R>) {
             Ok(_) => {}
             Err(code) if code == "up_to_date" || code == "nothing_to_pull" => {}
             Err(code) => log::info!("silent startup pull skipped/failed: {code}"),
+        }
+    });
+}
+
+/// What the remote poller should do on a given tick. A pure function so
+/// the ordering rules — a pending local push always beats a pull — stay
+/// unit-testable without a live app handle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum PollAction {
+    Pull,
+    SkipNotLoggedIn,
+    /// Local has unpushed mutations: let the auto-push watcher publish
+    /// them first. Pulling now would snapshot-and-discard the user's fresh
+    /// work in favour of a (presumably older) remote copy.
+    SkipPendingPush,
+    /// A push is mid-round-trip; its PUT decides the remote state, so the
+    /// next tick re-checks instead of racing it.
+    SkipInFlight,
+}
+
+pub(super) fn decide_poll(logged_in: bool, dirty: bool, in_flight: bool) -> PollAction {
+    if !logged_in {
+        PollAction::SkipNotLoggedIn
+    } else if dirty {
+        PollAction::SkipPendingPush
+    } else if in_flight {
+        PollAction::SkipInFlight
+    } else {
+        PollAction::Pull
+    }
+}
+
+/// Continuous remote-change watcher: every [`POLL_INTERVAL`], when logged
+/// in and nothing local is pending, compare the remote payload with the
+/// last known hash and pull-overwrite (snapshot first) when another machine
+/// pushed. `pull_once` is a no-op when hashes match, so the steady-state
+/// cost is one cheap GET per tick. The loop never exits; errors just
+/// throttle to the next tick.
+pub fn start_remote_poller<R: Runtime>(app: AppHandle<R>) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(POLL_INTERVAL).await;
+            let logged_in = is_logged_in(&app);
+            let dirty = DIRTY.load(Ordering::Relaxed);
+            let in_flight = IN_FLIGHT.load(Ordering::Relaxed);
+            if !matches!(decide_poll(logged_in, dirty, in_flight), PollAction::Pull) {
+                continue;
+            }
+            match pull_once(&app, true).await {
+                Ok(_) => {}
+                Err(code) if code == "up_to_date" || code == "nothing_to_pull" => {}
+                Err(code) => log::info!("remote poll pull skipped/failed: {code}"),
+            }
         }
     });
 }
