@@ -1,4 +1,5 @@
 import { httpApiEnglish } from '../httpApi'
+import { cloudSyncEnglish } from '../cloudSync'
 import { importEnglish } from '../import'
 /**
  * @author: bergo
@@ -9,6 +10,7 @@ import { LanguageDict } from '@common/types'
 
 const lang: LanguageDict = {
   ...httpApiEnglish,
+  ...cloudSyncEnglish,
   ...importEnglish,
   _app_name: 'SwitchHosts',
   hosts_managed_start: 'Verwalteter Anfang',

@@ -1,8 +1,10 @@
 import { httpApiEnglish } from '../httpApi'
+import { cloudSyncEnglish } from '../cloudSync'
 import type { LanguageDict } from '@common/types'
 
 export default {
   ...httpApiEnglish,
+  ...cloudSyncEnglish,
   import_preview: 'Prévia da importação',
   import_next_step: 'Avançar',
   import_append: 'Adicionar',

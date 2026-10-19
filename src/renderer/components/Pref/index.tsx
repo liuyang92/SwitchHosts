@@ -15,6 +15,7 @@ import useI18n from '@renderer/models/useI18n'
 import { IconAdjustments, IconCheck, IconDeviceFloppy } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import Advanced from './Advanced'
+import CloudSync from './CloudSync'
 import Commands from './Commands'
 import { mergeConfigUpdateIntoDraft } from './configSync'
 import General from './General'
@@ -208,6 +209,7 @@ const PreferencePanel = () => {
             <Tabs.Tab value="commands">{lang.commands}</Tabs.Tab>
             <Tabs.Tab value="proxy">{lang.proxy}</Tabs.Tab>
             <Tabs.Tab value="advanced">{lang.advanced}</Tabs.Tab>
+            <Tabs.Tab value="cloud_sync">{lang.cloud_sync}</Tabs.Tab>
           </Tabs.List>
           <div className={styles.tab_panels}>
             <Tabs.Panel value="general" className={styles.tab_panel}>
@@ -235,6 +237,13 @@ const PreferencePanel = () => {
               <ScrollArea className={styles.scroll_area} offsetScrollbars="y" scrollbars="y">
                 <div className={styles.tab_panel_content}>
                   <Advanced data={data} onChange={onSaveImmediate} onSaveHttpApi={onSaveHttpApi} />
+                </div>
+              </ScrollArea>
+            </Tabs.Panel>
+            <Tabs.Panel value="cloud_sync" className={styles.tab_panel}>
+              <ScrollArea className={styles.scroll_area} offsetScrollbars="y" scrollbars="y">
+                <div className={styles.tab_panel_content}>
+                  <CloudSync />
                 </div>
               </ScrollArea>
             </Tabs.Panel>

@@ -417,7 +417,12 @@ pub async fn get_content_of_list(
 
 #[tauri::command]
 pub async fn set_list(state: State<'_, AppState>, args: Args) -> Result<Value, StorageError> {
-    set_list_inner(&state, args)
+    let result = set_list_inner(&state, args);
+    if result.is_ok() {
+        // Cloud sync auto-push: the hosts tree changed.
+        crate::cloud_sync::on_data_mutated();
+    }
+    result
 }
 
 fn set_list_inner(state: &AppState, args: Args) -> Result<Value, StorageError> {
@@ -477,6 +482,7 @@ pub async fn move_to_trashcan(
     state.require_data_dir_usable()?;
     let id = arg_str(&args, 0, "id")?.to_string();
     move_ids_to_trashcan(&state, &[id])?;
+    crate::cloud_sync::on_data_mutated();
     Ok(Value::Null)
 }
 
@@ -500,6 +506,7 @@ pub async fn move_many_to_trashcan(
         }
     };
     move_ids_to_trashcan(&state, &ids)?;
+    crate::cloud_sync::on_data_mutated();
     Ok(Value::Null)
 }
 
@@ -537,7 +544,11 @@ pub async fn clear_trashcan(
     state: State<'_, AppState>,
     _args: Args,
 ) -> Result<Value, StorageError> {
-    clear_trashcan_inner(&state, _args)
+    let result = clear_trashcan_inner(&state, _args);
+    if result.is_ok() {
+        crate::cloud_sync::on_data_mutated();
+    }
+    result
 }
 
 fn clear_trashcan_inner(state: &AppState, _args: Args) -> Result<Value, StorageError> {
@@ -571,7 +582,11 @@ pub async fn delete_item_from_trashcan(
     state: State<'_, AppState>,
     args: Args,
 ) -> Result<Value, StorageError> {
-    delete_item_from_trashcan_inner(&state, args)
+    let result = delete_item_from_trashcan_inner(&state, args);
+    if result.is_ok() {
+        crate::cloud_sync::on_data_mutated();
+    }
+    result
 }
 
 fn delete_item_from_trashcan_inner(state: &AppState, args: Args) -> Result<Value, StorageError> {
@@ -602,7 +617,11 @@ pub async fn restore_item_from_trashcan(
     state: State<'_, AppState>,
     args: Args,
 ) -> Result<Value, StorageError> {
-    restore_item_from_trashcan_inner(&state, args)
+    let result = restore_item_from_trashcan_inner(&state, args);
+    if result.is_ok() {
+        crate::cloud_sync::on_data_mutated();
+    }
+    result
 }
 
 fn restore_item_from_trashcan_inner(state: &AppState, args: Args) -> Result<Value, StorageError> {
@@ -670,6 +689,7 @@ pub async fn set_hosts_content(
         })?
         .to_string();
     entries::write_entry(&state.paths.entries_dir, &id, &content)?;
+    crate::cloud_sync::on_data_mutated();
     Ok(Value::Null)
 }
 
@@ -1639,6 +1659,7 @@ pub async fn commit_import<R: Runtime>(
     if let Err(error) = tray::refresh_title(&app, &state) {
         log::warn!("failed to refresh tray title after import: {error}");
     }
+    crate::cloud_sync::on_data_mutated();
     Ok(result)
 }
 
@@ -2143,4 +2164,95 @@ pub async fn reset_data_dir<R: Runtime>(
     app.restart();
     #[allow(unreachable_code)]
     Ok(Value::Null)
+}
+
+// ---- cloud sync ------------------------------------------------------------
+
+#[tauri::command]
+pub async fn sync_status<R: Runtime>(app: AppHandle<R>, _args: Args) -> Result<Value, String> {
+    crate::cloud_sync::status(&app)
+}
+
+#[tauri::command]
+pub async fn sync_verify_token<R: Runtime>(
+    app: AppHandle<R>,
+    args: Args,
+) -> Result<Value, String> {
+    let platform = arg_str(&args, 0, "platform").map_err(|e| e.to_string())?;
+    let token = arg_str(&args, 1, "token").map_err(|e| e.to_string())?;
+    let platform = crate::cloud_sync::Platform::from_str(platform)
+        .ok_or_else(|| "invalid_platform".to_string())?;
+    crate::cloud_sync::verify_token(&app, platform, token.to_string()).await
+}
+
+#[tauri::command]
+pub async fn sync_start_device_login<R: Runtime>(
+    app: AppHandle<R>,
+    args: Args,
+) -> Result<Value, String> {
+    let client_id = arg_str(&args, 0, "client_id").map_err(|e| e.to_string())?.to_string();
+    crate::cloud_sync::start_device_login(&app, client_id).await
+}
+
+#[tauri::command]
+pub async fn sync_poll_device_login<R: Runtime>(
+    app: AppHandle<R>,
+    args: Args,
+) -> Result<Value, String> {
+    let client_id = arg_str(&args, 0, "client_id").map_err(|e| e.to_string())?.to_string();
+    let device_code = arg_str(&args, 1, "device_code").map_err(|e| e.to_string())?.to_string();
+    crate::cloud_sync::poll_device_login(&app, client_id, device_code).await
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SyncSetupParams {
+    platform: String,
+    auth_method: String,
+    token: String,
+    login: String,
+    repo: String,
+    #[serde(default)]
+    device_client_id: Option<String>,
+}
+
+#[tauri::command]
+pub async fn sync_setup<R: Runtime>(app: AppHandle<R>, args: Args) -> Result<Value, String> {
+    let params: SyncSetupParams =
+        serde_json::from_value(args.first().cloned().unwrap_or(Value::Null))
+            .map_err(|_| "invalid_data".to_string())?;
+    let platform = crate::cloud_sync::Platform::from_str(&params.platform)
+        .ok_or_else(|| "invalid_platform".to_string())?;
+    let auth_method = crate::cloud_sync::AuthMethod::from_str(&params.auth_method)
+        .ok_or_else(|| "invalid_auth_method".to_string())?;
+    if auth_method == crate::cloud_sync::AuthMethod::Device
+        && platform != crate::cloud_sync::Platform::Github
+    {
+        return Err("device_flow_github_only".to_string());
+    }
+    crate::cloud_sync::setup(
+        &app,
+        platform,
+        auth_method,
+        params.token,
+        params.login,
+        params.repo,
+        params.device_client_id,
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn sync_pull<R: Runtime>(app: AppHandle<R>, _args: Args) -> Result<Value, String> {
+    crate::cloud_sync::pull_once(&app, false).await
+}
+
+#[tauri::command]
+pub async fn sync_push<R: Runtime>(app: AppHandle<R>, _args: Args) -> Result<Value, String> {
+    crate::cloud_sync::push_once(&app).await
+}
+
+#[tauri::command]
+pub async fn sync_logout<R: Runtime>(app: AppHandle<R>, _args: Args) -> Result<Value, String> {
+    crate::cloud_sync::logout(&app).await
 }

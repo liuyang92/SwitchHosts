@@ -1,5 +1,6 @@
 import { httpApiChinese } from '../httpApi'
 import { importChinese } from '../import'
+import { cloudSyncChinese } from '../cloudSync'
 /**
  * @author: oldj
  * @homepage: https://oldj.net
@@ -10,6 +11,7 @@ import { LanguageDict } from '@common/types'
 const lang: LanguageDict = {
   ...httpApiChinese,
   ...importChinese,
+  ...cloudSyncChinese,
   _app_name: 'SwitchHosts',
   hosts_managed_start: '托管开始',
   hosts_managed_end: '托管结束',

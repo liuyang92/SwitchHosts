@@ -1,4 +1,5 @@
 mod app_menu;
+mod cloud_sync;
 mod commands;
 pub mod dns;
 mod find;
@@ -417,6 +418,13 @@ pub fn run() {
                 // Wakes every 60s, replaces `src/main/libs/cron.ts`.
                 refresh::start_background_scanner(app_handle.clone());
 
+                // Cloud sync: schedule a silent pull shortly after launch
+                // (renderer's initial reads get the store lock first), and
+                // keep the debounce auto-push watcher alive so every local
+                // data mutation eventually reaches the configured repo.
+                cloud_sync::start_startup_pull(app_handle.clone());
+                cloud_sync::start_auto_push_watcher(app_handle.clone());
+
                 // Preserve the enabled preference on startup failure; the
                 // preferences pane reads runtime status and lets users fix the
                 // port without losing their intent to run the API.
@@ -554,6 +562,15 @@ pub fn run() {
             commands::commit_import,
             commands::discard_import,
             commands::rebase_import,
+            // cloud sync
+            commands::sync_status,
+            commands::sync_verify_token,
+            commands::sync_start_device_login,
+            commands::sync_poll_device_login,
+            commands::sync_setup,
+            commands::sync_pull,
+            commands::sync_push,
+            commands::sync_logout,
             // updater
             commands::check_update,
             commands::download_update,

@@ -3363,6 +3363,7 @@ dependencies = [
  "rustls-platform-verifier",
  "serde",
  "serde_json",
+ "serde_urlencoded",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
@@ -4035,6 +4036,7 @@ name = "switchhosts"
 version = "5.0.3-beta.3"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "block2",
  "chrono",
  "dirs 7.0.0",
@@ -4048,6 +4050,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-nspanel",

@@ -1,5 +1,6 @@
 import { httpApiTraditionalChinese } from '../httpApi'
 import { importTraditionalChinese } from '../import'
+import { cloudSyncTraditionalChinese } from '../cloudSync'
 /**
  * @author: rayatn1011
  * @homepage: https://github.com/rayatn1011
@@ -10,6 +11,7 @@ import { LanguageDict } from '@common/types'
 const lang: LanguageDict = {
   ...httpApiTraditionalChinese,
   ...importTraditionalChinese,
+  ...cloudSyncTraditionalChinese,
   _app_name: 'SwitchHosts',
   hosts_managed_start: '託管開始',
   hosts_managed_end: '託管結束',
