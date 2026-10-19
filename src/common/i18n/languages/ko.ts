@@ -1,4 +1,5 @@
 import { httpApiEnglish } from '../httpApi'
+import { cloudSyncEnglish } from '../cloudSync'
 import { importEnglish } from '../import'
 /**
  * @author: wooklab
@@ -6,6 +7,7 @@ import { importEnglish } from '../import'
 
 export default {
   ...httpApiEnglish,
+  ...cloudSyncEnglish,
   ...importEnglish,
   _app_name: 'SwitchHosts',
   hosts_managed_start: '관리 영역 시작',

@@ -1,5 +1,6 @@
 import { httpApiEnglish } from '../httpApi'
 import { importEnglish } from '../import'
+import { cloudSyncEnglish } from '../cloudSync'
 /**
  * @author: oldj
  * @homepage: https://oldj.net
@@ -8,6 +9,7 @@ import { importEnglish } from '../import'
 export default {
   ...httpApiEnglish,
   ...importEnglish,
+  ...cloudSyncEnglish,
   _app_name: 'SwitchHosts',
   hosts_managed_start: 'Managed start',
   hosts_managed_end: 'Managed end',
