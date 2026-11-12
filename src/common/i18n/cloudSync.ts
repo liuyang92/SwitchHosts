@@ -11,7 +11,7 @@ export const cloudSyncEnglish = {
     'Generate a token with repository read/write permission on your platform, then paste it here.',
   cloud_sync_device_client_id: 'Device client id',
   cloud_sync_device_client_id_help:
-    'Browser authorization needs the client id of a GitHub OAuth App with "Device Flow" enabled.',
+    'Browser authorization needs the client id of a GitHub OAuth App with "Device Flow" enabled. The access token it issues expires (typically after 8 hours) and needs to be re-authorized by the browser on expiration.',
   cloud_sync_verify: 'Verify',
   cloud_sync_verifying: 'Verifying…',
   cloud_sync_verify_ok: 'Verified: {0}',
@@ -82,7 +82,7 @@ export const cloudSyncChinese: typeof cloudSyncEnglish = {
   cloud_sync_token_help: '在平台生成具有仓库读写权限的令牌，然后粘贴到这里。',
   cloud_sync_device_client_id: 'Device client id',
   cloud_sync_device_client_id_help:
-    '浏览器授权需要启用了 Device Flow 的 GitHub OAuth App 的 client id。',
+    '浏览器授权需要启用了 Device Flow 的 GitHub OAuth App 的 client id。该方式获取的访问令牌会过期（通常 8 小时左右），过期后需要重新通过浏览器授权。',
   cloud_sync_verify: '验证',
   cloud_sync_verifying: '验证中…',
   cloud_sync_verify_ok: '验证通过：{0}',
@@ -151,7 +151,7 @@ export const cloudSyncTraditionalChinese: typeof cloudSyncEnglish = {
   cloud_sync_token_help: '在平台產生具有倉庫讀寫權限的權杖，然後貼到這裡。',
   cloud_sync_device_client_id: 'Device client id',
   cloud_sync_device_client_id_help:
-    '瀏覽器授權需要啟用了 Device Flow 的 GitHub OAuth App 的 client id。',
+    '瀏覽器授權需要啟用了 Device Flow 的 GitHub OAuth App 的 client id。該方式取得的存取權杖會過期（通常 8 小時左右），過期後需要重新透過瀏覽器授權。',
   cloud_sync_verify: '驗證',
   cloud_sync_verifying: '驗證中…',
   cloud_sync_verify_ok: '驗證通過：{0}',
