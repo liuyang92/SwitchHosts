@@ -1,4 +1,4 @@
-﻿//! Sync engine: first-time setup, pull-overwrite, push-if-changed, and the
+//! Sync engine: first-time setup, pull-overwrite, push-if-changed, and the
 //! background watchers that keep local and remote in step like a local git
 //! workflow — the auto-push watcher publishes local mutations (debounced),
 //! and the remote poller periodically fetches remote changes.
@@ -207,7 +207,7 @@ pub async fn setup<R: Runtime>(
         login,
         repo
     );
-    let exists = provider
+    let mut exists = provider
         .has_repo(&client, &token, &login, &repo)
         .await
         .map_err(err_code)?;
@@ -224,11 +224,28 @@ pub async fn setup<R: Runtime>(
         last_hash: None,
     };
 
-    let result = if !exists {
-        provider
+    if !exists {
+        match provider
             .create_repo(&client, &account.token, &account.repo)
             .await
-            .map_err(err_code)?;
+        {
+            Ok(()) => {}
+            Err(SyncError::CreateRepoNotAllowed) => {
+                // Fine-grained PATs can never call POST /user/repos (GitHub
+                // platform limitation, not a permissions issue). Assume the
+                // user pre-created the repo and granted the token access;
+                // if not, the file calls below surface a clearer error.
+                log::info!(
+                    "create_repo not allowed (fine-grained token) - assuming repo {} already exists",
+                    account.repo
+                );
+                exists = true;
+            }
+            Err(e) => return Err(err_code(e)),
+        }
+    }
+
+    let result = if !exists {
         let summary = push_new_file(app, &client, &provider, &account).await?;
         account.last_push_at = Some(now_rfc3339());
         account.last_hash = Some(summary.hash.clone());

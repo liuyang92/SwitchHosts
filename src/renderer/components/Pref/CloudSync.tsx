@@ -177,6 +177,18 @@ const CloudSync = () => {
     }
   }
 
+  // Switching platform or auth method invalidates the flow so far: a
+  // token verified for one platform/method must not leak into another.
+  function resetAuthInputs() {
+    cancelDevicePoll()
+    setToken('')
+    setVerifiedLogin('')
+    setGithubAppToken(false)
+    setDeviceInfo(null)
+    setDeviceError('')
+    setStep('auth')
+  }
+
   const startDeviceLogin = async () => {
     setBusy(true)
     setDeviceError('')
@@ -426,6 +438,7 @@ const CloudSync = () => {
               onChange={(v) => {
                 const next = v as PlatformId
                 setPlatform(next)
+                resetAuthInputs()
                 // Device authorization only exists on GitHub; fall back to
                 // PAT when switching to Gitee with device selected.
                 if (next === 'gitee' && authMethod === 'device') {
@@ -448,7 +461,7 @@ const CloudSync = () => {
             </Text>
             <SegmentedControl
               value={authMethod}
-              onChange={(v) => setAuthMethod(v as AuthMethodId)}
+              onChange={(v) => { setAuthMethod(v as AuthMethodId); resetAuthInputs() }}
               data={[
                 { value: 'pat', label: lang.cloud_sync_auth_pat },
                 {
